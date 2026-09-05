@@ -1,0 +1,19 @@
+{
+  "$schema": "https://rork.com/schema/rork.json",
+  "apps": [
+    {
+      "name": "Fit",
+      "path": "ios-fit",
+      "framework": "swift",
+      "settings": {
+        "displayName": "LightBolt",
+        "iosBundleId": "nectar.app.60v7ufjd0cnhxmxzlcg60"
+      }
+    },
+    {
+      "name": "Functions",
+      "path": "functions",
+      "framework": "cloudflare"
+    }
+  ]
+}
