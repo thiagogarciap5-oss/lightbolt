@@ -66,6 +66,7 @@ jobs:
           path: ${{ env.SCHEME }}.app.zip
 
       - name: Deploy to Appetize.io
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           APPETIZE_TOKEN: ${{ secrets.APPETIZE_TOKEN }}
         run: |
