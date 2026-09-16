@@ -1,0 +1,76 @@
+name: iOS Preview Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-preview:
+    name: Build & Deploy to Appetize
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    env:
+      SCHEME: LightBolt
+      PROJECT: ios-fit/LightBolt.xcodeproj
+      CONFIGURATION: Debug
+      SDK: iphonesimulator
+      DERIVED_DATA: ${{ github.workspace }}/build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk "$SDK" \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean build
+
+      - name: Verify build output
+        run: |
+          APP_PATH="$DERIVED_DATA/Build/Products/${CONFIGURATION}-${SDK}/${SCHEME}.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "::error::Expected .app not found at $APP_PATH"
+            find "$DERIVED_DATA/Build/Products" -maxdepth 2 -name "*.app"
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: Package .app as .zip
+        run: |
+          cd "$(dirname "$APP_PATH")"
+          ditto -c -k --sequesterRsrc --keepParent "$(basename "$APP_PATH")" "${GITHUB_WORKSPACE}/${SCHEME}.app.zip"
+          ls -lh "${GITHUB_WORKSPACE}/${SCHEME}.app.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SCHEME }}-simulator-app
+          path: ${{ env.SCHEME }}.app.zip
+
+      - name: Deploy to Appetize.io
+        env:
+          APPETIZE_TOKEN: ${{ secrets.APPETIZE_TOKEN }}
+        run: |
+          curl --fail-with-body -X POST \
+            -H "X-API-KEY: $APPETIZE_TOKEN" \
+            -F "file=@${SCHEME}.app.zip" \
+            -F "platform=ios" \
+            https://api.appetize.io/v1/apps
