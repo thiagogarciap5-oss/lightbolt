@@ -70,8 +70,30 @@ jobs:
         env:
           APPETIZE_TOKEN: ${{ secrets.APPETIZE_TOKEN }}
         run: |
-          curl --fail-with-body -X POST \
+          response=$(curl --fail-with-body --silent --show-error -X POST \
             -H "X-API-KEY: $APPETIZE_TOKEN" \
             -F "file=@${SCHEME}.app.zip" \
             -F "platform=ios" \
-            https://api.appetize.io/v1/apps
+            https://api.appetize.io/v1/apps)
+
+          private_key=$(printf '%s' "$response" | jq -r '.privateKey // empty')
+          if [ -n "$private_key" ]; then
+            echo "::add-mask::$private_key"
+          fi
+
+          app_url=$(printf '%s' "$response" | jq -r '.appURL // empty')
+          if [ -z "$app_url" ]; then
+            echo "::error::Appetize upload did not return an app URL"
+            printf '%s\n' "$response"
+            exit 1
+          fi
+
+          echo "Appetize preview: $app_url"
+          echo "preview_url=$app_url" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### iOS preview deployed"
+            echo ""
+            echo "[Open in Appetize.io]($app_url)"
+          } >> "$GITHUB_STEP_SUMMARY"
+        id: appetize
